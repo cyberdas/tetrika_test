@@ -3,7 +3,9 @@ from typing import Union, List
 
 CustomList = List[Union[int, str]]
 
-# Сложность O(log n)
+# Сложность алгоритма O(log n)
+# В тексте задания было сказано, что за последовательностью единиц следуют нули, 
+# поэтому вариант с отсутствием нуля не учитывал
 def task(array: Union[CustomList, str]):
     """Возвращает первое вхождение 0 в массив
     >>> task('111111111111111111111111100000000')
@@ -28,10 +30,8 @@ def task(array: Union[CustomList, str]):
     return f'OUT:{right}'
 
 
-print(task('111111111111111111111111100000000'))
-print(task(['1', 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]))
-
-
 if __name__ == "__main__": 
     import doctest
     doctest.testmod()
+    print(task('111111111111111111111111100000000'))
+    print(task(['1', 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]))

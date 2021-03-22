@@ -1,53 +1,57 @@
-import requests
-import time
+import asyncio
+import aiohttp
 from bs4 import BeautifulSoup
 from collections import defaultdict
+import time
 
 
-class Parser:
+class Factory:
 
     def __init__(self):
-        self.url = 'https://ru.wikipedia.org/wiki/%D0%9A%D0%B0%D1%82%D0' \
-                   '%B5%D0%B3%D0%BE%D1%80%D0%B8%D1%8F:%D0%96%D0%B8%D0%B2%D' \
-                   '0%BE%D1%82%D0%BD%D1%8B%D0%B5_%D0%BF%D0%BE_%D0%B0%' \
-                   'D0%BB%D1%84%D0%B0%D0%B2%D0%B8%D1%82%D1%83'
+        self.url = 'https://ru.wikipedia.org/w/index.php?title=%D0%9A%D0'\
+                    '%B0%D1%82%D0%B5%D0%B3%D0%BE%D1%80%D0%B8%D1%8F:%D0%96'\
+                    '%D0%B8%D0%B2%D0%BE%D1%82%D0%BD%D1%8B%D0%B5_%D0%BF%D0'\
+                    '%BE_%D0%B0%D0%BB%D1%84%D0%B0%D0%B2%D0%B8%D1%82%D1%83'
         self.data = defaultdict(int)
-        self.response = None
+        self.alphabet = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'Й', 'К',
+                         'Л', 'М', 'Н', 'О', 'П', 'Р', 'С', 'Т', 'У', 'Ф', 'Х',
+                         'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я']
 
-    def get_response(self):
-        response = requests.get(self.url, timeout=15)
-        response = response.text
-        self.response = BeautifulSoup(response, 'lxml')
+    async def get_urls(self, letter: str):
+        url = self.url + '&from=' + letter
+        while url:
+            url = await self.get_page_content(url, letter)
 
-    def get_name(self):
-        links = self.response.find(class_='mw-category').find_all('a') # первые 200 ответов
-        for link in links:
-            first_letter = link.text[0]
-            self.data[first_letter] += 1 # добавляем в словарь
+    async def get_page_content(self, url: str, letter: str):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                content = await response.read()
+                soup = BeautifulSoup(content, 'lxml')
+                links = soup.find('div', attrs={'class': 'mw-category-group'}).find_all('li')
+                if letter in ('Ы', 'Ъ', 'Ь'):
+                    self.data[letter] = 0 
+                    return None
+                letters = [letter.text[0] for letter in links]
+                if letters[0] != letter:
+                    return None
+                self.data[letter] += len(letters)
+                link_url = soup.find('a', string='Следующая страница')
+                if not link_url:
+                    return None
+                url = 'https://ru.wikipedia.org/' + link_url.get('href')
+        return url
+
+    async def main(self):
+        tasks = [self.get_urls(letter) for letter in self.alphabet]
+        await asyncio.gather(*tasks)
         return self.data
-
-    def get_next_page(self):
-        links = self.response.find(id='mw-pages').find_all('a')
-        for link in links:
-            if link.text == 'Следующая страница': # урл становится следующей страницей
-                self.url = 'https://ru.wikipedia.org/' + link.get('href')
-                self.run()
-
-    def run(self):
-        self.get_response()
-        self.get_name()
-        self.get_next_page()
-        return self.data
-
-
-def main():
-    start = time.time()
-    parser = Parser()
-    res = parser.run()
-    print(time.time() - start)
-    for key, value in res.items():
-        print(key, value)
 
 
 if __name__ == '__main__':
-    main()
+    t1 = time.time()
+    factory = Factory()
+    result = asyncio.run(factory.main())
+    test = 1
+    for k, v in sorted(result.items()):
+        print(k, v)
+    print(time.time() - t1)

@@ -18,40 +18,39 @@ class Factory:
                          'Ц', 'Ч', 'Ш', 'Щ', 'Ъ', 'Ы', 'Ь', 'Э', 'Ю', 'Я']
 
     async def get_urls(self, letter: str):
-        url = self.url + '&from=' + letter
-        while url:
-            url = await self.get_page_content(url, letter)
-
-    async def get_page_content(self, url: str, letter: str):
         async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                content = await response.read()
-                soup = BeautifulSoup(content, 'lxml')
-                links = soup.find('div', attrs={'class': 'mw-category-group'}).find_all('li')
-                if letter in ('Ы', 'Ъ', 'Ь'):
-                    self.data[letter] = 0 
-                    return None
-                letters = [letter.text[0] for letter in links]
-                if letters[0] != letter:
-                    return None
-                self.data[letter] += len(letters)
-                link_url = soup.find('a', string='Следующая страница')
-                if not link_url:
-                    return None
-                url = 'https://ru.wikipedia.org/' + link_url.get('href')
+            url = self.url + '&from=' + letter
+            while url:
+                url = await self.get_page_content(url, letter, session)
+
+    async def get_page_content(self, url: str, letter: str, session):
+        async with session.get(url) as response:
+            content = await response.read()
+            soup = BeautifulSoup(content, 'lxml')
+            links = soup.find('div', attrs={'class': 'mw-category-group'}).find_all('li')
+            if letter in ('Ы', 'Ъ', 'Ь'):
+                self.data[letter] = 0
+                return None
+            letters = [letter.text[0] for letter in links]
+            if letters[0] != letter:
+                return None
+            self.data[letter] += len(letters)
+            link_url = soup.find('a', string='Следующая страница')
+            if not link_url:
+                return None
+            url = 'https://ru.wikipedia.org/' + link_url.get('href')
         return url
 
     async def main(self):
         tasks = [self.get_urls(letter) for letter in self.alphabet]
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks) 
         return self.data
 
 
 if __name__ == '__main__':
     t1 = time.time()
     factory = Factory()
-    result = asyncio.run(factory.main())
-    test = 1
+    result = asyncio.run(factory.main()) # запускает event loop
     for k, v in sorted(result.items()):
         print(k, v)
     print(time.time() - t1)
